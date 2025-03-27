@@ -6,22 +6,26 @@ import xarray as xr
 from metpy.units import units
 import metpy.calc as mpcalc
 from pathlib import Path
+from concurrent.futures import ThreadPoolExecutor
 
-# Definir la carpeta base (la raíz del repositorio)
+# Importa Streamlit globalmente para usar sus decoradores y funciones
+import streamlit as st
+
+# Define la ruta base del proyecto (la carpeta donde está este script)
 BASE_DIR = Path(__file__).parent.resolve()
 
+# Usa ZoneInfo para manejar zonas horarias
 try:
     from zoneinfo import ZoneInfo
 except ImportError:
     from backports.zoneinfo import ZoneInfo
-
 LOCAL_TZ = ZoneInfo("America/Mexico_City")
 
 # -------------------------- Funciones comunes --------------------------
 
 def geocode(place_name):
     url = f"https://nominatim.openstreetmap.org/search?format=json&q={place_name}"
-    r = requests.get(url, headers={"User-Agent":"MiApp/1.0"})
+    r = requests.get(url, headers={"User-Agent": "MiApp/1.0"})
     data = r.json()
     if not data:
         raise Exception(f"No se encontró {place_name}")
@@ -39,10 +43,10 @@ def get_route_osrm(origin, destination):
 
 def segment_route(coords, start_time, speed_kmh, km_step=10):
     line = LineString(coords)
-    length_km = line.length * 111
+    length_km = line.length * 111  # Aproximación: 1 grado ≈ 111 km
     n = math.ceil(length_km / km_step)
     segments = []
-    for i in range(n+1):
+    for i in range(n + 1):
         frac = i / n
         pt = line.interpolate(frac, normalized=True)
         hours = (length_km * frac) / speed_kmh
@@ -55,39 +59,44 @@ def segment_route(coords, start_time, speed_kmh, km_step=10):
     return segments
 
 def interpolate(ds, var, lat, lon, t):
-    v = ds[var].interp(time=t, lat=lat, lon=lon).compute().values
-    return float(v) if v is not None else np.nan
+    # Selecciona el valor más cercano en vez de hacer una interpolación continua
+    val = ds[var].sel(time=t, lat=lat, lon=lon, method="nearest").compute().values
+    return float(val) if val is not None else np.nan
+
+def forecast_point(seg, ds):
+    t = seg["time"]
+    t2 = interpolate(ds, "T2", seg["lat"], seg["lon"], t) - 273.15
+    rain = interpolate(ds, "RAINNC", seg["lat"], seg["lon"], t)
+    u10 = interpolate(ds, "U10", seg["lat"], seg["lon"], t)
+    v10 = interpolate(ds, "V10", seg["lat"], seg["lon"], t)
+    ws = (mpcalc.wind_speed(u10 * units("m/s"), v10 * units("m/s")).to("km/h").magnitude
+          if not np.isnan(u10 + v10) else np.nan)
+    risk = "low"
+    if rain > 5 or ws > 60:
+        risk = "medium"
+    if rain > 15 or ws > 80:
+        risk = "high"
+    return {
+        "segment_id": seg["segment_id"],
+        "time_utc": t.isoformat(),
+        "latitude": seg["lat"],
+        "longitude": seg["lon"],
+        "temp_c": round(t2, 1),
+        "rain_mm_h": round(rain, 2),
+        "wind_km_h": round(ws, 1),
+        "risk_level": risk
+    }
 
 def route_forecast_real(origin, destination, start_time, speed, ds):
     coords = get_route_osrm(origin, destination)
-    forecast = []
-    for seg in segment_route(coords, start_time, speed):
-        t = seg["time"]
-        t2 = interpolate(ds, "T2", seg["lat"], seg["lon"], t) - 273.15
-        rain = interpolate(ds, "RAINNC", seg["lat"], seg["lon"], t)
-        u10 = interpolate(ds, "U10", seg["lat"], seg["lon"], t)
-        v10 = interpolate(ds, "V10", seg["lat"], seg["lon"], t)
-        ws = (mpcalc.wind_speed(u10 * units("m/s"), v10 * units("m/s"))
-              .to("km/h").magnitude if not np.isnan(u10 + v10) else np.nan)
-        level = "low"
-        if rain > 5 or ws > 60:
-            level = "medium"
-        if rain > 15 or ws > 80:
-            level = "high"
-        forecast.append({
-            "segment_id": seg["segment_id"],
-            "time_utc": t.isoformat(),
-            "latitude": seg["lat"],
-            "longitude": seg["lon"],
-            "temp_c": round(t2, 1),
-            "rain_mm_h": round(rain, 2),
-            "wind_km_h": round(ws, 1),
-            "risk_level": level
-        })
+    segments = segment_route(coords, start_time, speed)
+    with ThreadPoolExecutor(max_workers=128) as executor:
+        forecast = list(executor.map(lambda seg: forecast_point(seg, ds), segments))
     return forecast, coords
 
 def generar_mapa(coords, forecast, origin, destination):
-    mid = [(origin["lat"] + destination["lat"]) / 2, (origin["lon"] + destination["lon"]) / 2]
+    mid = [(origin["lat"] + destination["lat"]) / 2,
+           (origin["lon"] + destination["lon"]) / 2]
     m = folium.Map(location=mid, zoom_start=7)
     folium.PolyLine([(y, x) for x, y in coords], color="blue", weight=4).add_to(m)
     for seg in forecast:
@@ -98,21 +107,19 @@ def generar_mapa(coords, forecast, origin, destination):
         ).add_to(m)
     m.save("ruta_map.html")
 
-def load_dataset():
-    # Usar una ruta relativa: el archivo wrf_actual.csv debe estar en la raíz del repositorio
+@st.cache_data(show_spinner=False)
+def load_dataset_cached():
     csv_path = BASE_DIR / "wrf_actual.csv"
     df = pd.read_csv(csv_path, parse_dates=["time"])
     df["time"] = pd.to_datetime(df["time"], errors="coerce")
     df = df.dropna(subset=["time"]).drop_duplicates(["time", "lat", "lon"])
     return df.set_index(["time", "lat", "lon"]).to_xarray()
 
-ds = load_dataset()
+ds = load_dataset_cached()
 
-# -------------------------- Función Streamlit --------------------------
+# -------------------------- Función principal (Streamlit) --------------------------
 
 def main_streamlit():
-    import streamlit as st
-
     st.title("Pronóstico de Ruta con WRF")
     origen = st.text_input("Origen", "Ciudad de México", key="origen")
     destino = st.text_input("Destino", "Veracruz", key="destino")
@@ -142,16 +149,14 @@ def main_streamlit():
             start, velocidad, ds
         )
         df = pd.DataFrame(forecast)
-        # Convertir time_utc a hora local como texto usando datetime (evitando problemas con tz_convert)
+        # Convertir time_utc a hora local como texto usando datetime puro
         df["time_local"] = df["time_utc"].apply(
             lambda s: datetime.datetime.fromisoformat(s)
                         .replace(tzinfo=datetime.timezone.utc)
                         .astimezone(LOCAL_TZ)
                         .strftime("%Y-%m-%d %H:%M:%S %Z")
         )
-
         st.subheader("Pronóstico de la Ruta")
-        # Mostrar solo las columnas útiles para el usuario
         st.write(df[["segment_id", "time_local", "temp_c", "rain_mm_h", "wind_km_h", "risk_level"]])
         generar_mapa(coords, forecast, {"lat": lat_o, "lon": lon_o}, {"lat": lat_d, "lon": lon_d})
         with open("ruta_map.html") as f:
