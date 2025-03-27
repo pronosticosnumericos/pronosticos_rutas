@@ -1,7 +1,7 @@
 import os
 from git import Repo, GitCommandError
 
-# Obtén el token desde la variable de entorno (asegúrate de haberlo exportado, e.g., export GITHUB_TOKEN="tu_token")
+# Obtén el token desde la variable de entorno
 token = os.environ.get("GITHUB_TOKEN")
 if not token:
     raise Exception("No se encontró la variable de entorno GITHUB_TOKEN.")
