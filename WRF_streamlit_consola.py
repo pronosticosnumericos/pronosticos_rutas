@@ -106,7 +106,11 @@ def generar_mapa(coords, forecast, origin, destination):
 def load_dataset_zarr():
     BASE_DIR = Path(__file__).parent.resolve()
     zarr_path = BASE_DIR / "wrf_actual.zarr"
-    return xr.open_zarr(zarr_path, engine="zarr", chunks={"time":1, "lat":50, "lon":50})
+    # Carga el dataset sin chunking
+    ds = xr.open_zarr(zarr_path)
+    # Aplica el rechunking después de la carga
+    ds = ds.chunk({"time": 1, "lat": 50, "lon": 50})
+    return ds
 
 
 ds = load_dataset_zarr()
