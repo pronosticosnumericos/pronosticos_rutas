@@ -120,20 +120,28 @@ def main_streamlit():
     st.title("Pronóstico de Ruta con WRF")
     origen = st.text_input("Origen", "Ciudad de México", key="origen")
     destino = st.text_input("Destino", "Veracruz", key="destino")
+    
+    # Muestra la hora local (como referencia)
     hora_local = st.text_input("Hora Local (YYYY-MM-DD HH:MM)", 
-                           datetime.datetime.now(LOCAL_TZ).strftime("%Y-%m-%d %H:%M"),
-                           key="hora")
+                               datetime.datetime.now(LOCAL_TZ).strftime("%Y-%m-%d %H:%M"),
+                               key="hora_local")
+    # Nuevo campo para ingresar la hora de salida deseada
+    hora_salida = st.text_input("Hora de Salida (YYYY-MM-DD HH:MM)", 
+                                datetime.datetime.now(LOCAL_TZ).strftime("%Y-%m-%d %H:%M"),
+                                key="hora_salida")
+    
     velocidad = st.number_input("Velocidad km/h", 80, key="vel")
     
     if st.button("Obtener Pronóstico", key="btn"):
         try:
-            user_local = datetime.datetime.strptime(hora_local, "%Y-%m-%d %H:%M")
+            # Parseamos la hora de salida ingresada por el usuario
+            user_salida = datetime.datetime.strptime(hora_salida, "%Y-%m-%d %H:%M")
         except ValueError:
-            st.error("Formato incorrecto — usa YYYY-MM-DD HH:MM")
+            st.error("Formato incorrecto en la hora de salida — usa YYYY-MM-DD HH:MM")
             return
         
-        # Convertir hora local a UTC y luego seleccionar el tiempo más cercano en ds
-        start_utc = user_local.replace(tzinfo=LOCAL_TZ).astimezone(datetime.timezone.utc).replace(tzinfo=None)
+        # Convertir la hora de salida a UTC y obtener el tiempo más cercano en el dataset
+        start_utc = user_salida.replace(tzinfo=LOCAL_TZ).astimezone(datetime.timezone.utc).replace(tzinfo=None)
         nearest = pd.to_datetime(ds.time.sel(time=start_utc, method="nearest").values)
         start = nearest.to_pydatetime()
         
@@ -146,7 +154,7 @@ def main_streamlit():
             start, velocidad, ds
         )
         df = pd.DataFrame(forecast)
-        # Convertir time_utc a hora local (como texto) sin problemas de tz
+        # Convertir time_utc a hora local para mostrarla al usuario
         df["time_local"] = df["time_utc"].apply(
             lambda s: datetime.datetime.fromisoformat(s)
                         .replace(tzinfo=datetime.timezone.utc)
