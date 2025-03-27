@@ -1,4 +1,4 @@
-import os, glob, requests, datetime, math
+import os, datetime, math, requests
 import pandas as pd, numpy as np
 from shapely.geometry import LineString
 import folium
@@ -7,14 +7,8 @@ from metpy.units import units
 import metpy.calc as mpcalc
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
-
-# Importa Streamlit globalmente para usar sus decoradores y funciones
 import streamlit as st
 
-# Define la ruta base del proyecto (la carpeta donde está este script)
-BASE_DIR = Path(__file__).parent.resolve()
-
-# Usa ZoneInfo para manejar zonas horarias
 try:
     from zoneinfo import ZoneInfo
 except ImportError:
@@ -43,7 +37,7 @@ def get_route_osrm(origin, destination):
 
 def segment_route(coords, start_time, speed_kmh, km_step=10):
     line = LineString(coords)
-    length_km = line.length * 111  # Aproximación: 1 grado ≈ 111 km
+    length_km = line.length * 111
     n = math.ceil(length_km / km_step)
     segments = []
     for i in range(n + 1):
@@ -59,7 +53,7 @@ def segment_route(coords, start_time, speed_kmh, km_step=10):
     return segments
 
 def interpolate(ds, var, lat, lon, t):
-    # Selecciona el valor más cercano en vez de hacer una interpolación continua
+    # Selecciona el valor más cercano para acelerar el proceso
     val = ds[var].sel(time=t, lat=lat, lon=lon, method="nearest").compute().values
     return float(val) if val is not None else np.nan
 
@@ -90,7 +84,7 @@ def forecast_point(seg, ds):
 def route_forecast_real(origin, destination, start_time, speed, ds):
     coords = get_route_osrm(origin, destination)
     segments = segment_route(coords, start_time, speed)
-    with ThreadPoolExecutor(max_workers=128) as executor:
+    with ThreadPoolExecutor(max_workers=16) as executor:  # Ajusta max_workers según el entorno
         forecast = list(executor.map(lambda seg: forecast_point(seg, ds), segments))
     return forecast, coords
 
@@ -107,57 +101,57 @@ def generar_mapa(coords, forecast, origin, destination):
         ).add_to(m)
     m.save("ruta_map.html")
 
+# -------------------------- Cargar dataset desde Zarr --------------------------
 @st.cache_data(show_spinner=False)
-def load_dataset_cached():
-    csv_path = BASE_DIR / "wrf_actual.csv"
-    df = pd.read_csv(csv_path, parse_dates=["time"])
-    df["time"] = pd.to_datetime(df["time"], errors="coerce")
-    df = df.dropna(subset=["time"]).drop_duplicates(["time", "lat", "lon"])
-    return df.set_index(["time", "lat", "lon"]).to_xarray()
+def load_dataset_zarr():
+    BASE_DIR = Path(__file__).parent.resolve()
+    zarr_path = BASE_DIR / "wrf_actual.zarr"
+    return xr.open_zarr(zarr_path, chunks={"time":1, "lat":50, "lon":50})
 
-ds = load_dataset_cached()
+ds = load_dataset_zarr()
 
 # -------------------------- Función principal (Streamlit) --------------------------
-
 def main_streamlit():
     st.title("Pronóstico de Ruta con WRF")
     origen = st.text_input("Origen", "Ciudad de México", key="origen")
     destino = st.text_input("Destino", "Veracruz", key="destino")
-    hora_local = st.text_input("Hora Local (YYYY-MM-DD HH:MM)",
+    hora_local = st.text_input("Hora Local (YYYY-MM-DD HH:MM)", 
                                datetime.datetime.now().strftime("%Y-%m-%d %H:%M"),
                                key="hora")
     velocidad = st.number_input("Velocidad km/h", 80, key="vel")
-
+    
     if st.button("Obtener Pronóstico", key="btn"):
         try:
             user_local = datetime.datetime.strptime(hora_local, "%Y-%m-%d %H:%M")
         except ValueError:
             st.error("Formato incorrecto — usa YYYY-MM-DD HH:MM")
             return
-
-        # Convertir la hora ingresada a UTC y seleccionar el tiempo más cercano en ds
+        
+        # Convertir hora local a UTC y luego seleccionar el tiempo más cercano en ds
         start_utc = user_local.replace(tzinfo=LOCAL_TZ).astimezone(datetime.timezone.utc).replace(tzinfo=None)
         nearest = pd.to_datetime(ds.time.sel(time=start_utc, method="nearest").values)
         start = nearest.to_pydatetime()
-
+        
         lat_o, lon_o = geocode(origen)
         lat_d, lon_d = geocode(destino)
-
+        
         forecast, coords = route_forecast_real(
             {"lat": lat_o, "lon": lon_o},
             {"lat": lat_d, "lon": lon_d},
             start, velocidad, ds
         )
         df = pd.DataFrame(forecast)
-        # Convertir time_utc a hora local como texto usando datetime puro
+        # Convertir time_utc a hora local (como texto) sin problemas de tz
         df["time_local"] = df["time_utc"].apply(
             lambda s: datetime.datetime.fromisoformat(s)
                         .replace(tzinfo=datetime.timezone.utc)
                         .astimezone(LOCAL_TZ)
                         .strftime("%Y-%m-%d %H:%M:%S %Z")
         )
+        
         st.subheader("Pronóstico de la Ruta")
         st.write(df[["segment_id", "time_local", "temp_c", "rain_mm_h", "wind_km_h", "risk_level"]])
+        
         generar_mapa(coords, forecast, {"lat": lat_o, "lon": lon_o}, {"lat": lat_d, "lon": lon_d})
         with open("ruta_map.html") as f:
             st.components.v1.html(f.read(), height=600)
