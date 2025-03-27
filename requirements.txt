@@ -1,0 +1,9 @@
+streamlit
+folium
+xarray
+metpy
+shapely>=1.7.1
+pandas
+numpy
+requests
+
