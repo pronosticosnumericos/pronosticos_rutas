@@ -121,8 +121,8 @@ def main_streamlit():
     origen = st.text_input("Origen", "Ciudad de México", key="origen")
     destino = st.text_input("Destino", "Veracruz", key="destino")
     hora_local = st.text_input("Hora Local (YYYY-MM-DD HH:MM)", 
-                               datetime.datetime.now().strftime("%Y-%m-%d %H:%M"),
-                               key="hora")
+                           datetime.datetime.now(LOCAL_TZ).strftime("%Y-%m-%d %H:%M"),
+                           key="hora")
     velocidad = st.number_input("Velocidad km/h", 80, key="vel")
     
     if st.button("Obtener Pronóstico", key="btn"):
