@@ -12,6 +12,13 @@ import streamlit_authenticator as stauth
 import yaml
 from yaml.loader import SafeLoader
 
+try:
+    from zoneinfo import ZoneInfo
+except ImportError:
+    from backports.zoneinfo import ZoneInfo
+LOCAL_TZ = ZoneInfo("America/Mexico_City")
+
+
 
 # ————— CARGA DE CONFIGURACIÓN —————
 with open("config.yaml") as file:
@@ -27,11 +34,7 @@ authenticator = stauth.Authenticate(
                       # ← Detiene ejecución
 
 
-try:
-    from zoneinfo import ZoneInfo
-except ImportError:
-    from backports.zoneinfo import ZoneInfo
-LOCAL_TZ = ZoneInfo("America/Mexico_City")
+
 
 # -------------------------- Funciones comunes --------------------------
 
@@ -138,13 +141,17 @@ def main_streamlit():
     st.title("Pronóstico de Ruta con WRF")
     origen = st.text_input("Origen", "Ciudad de México", key="origen")
     destino = st.text_input("Destino", "Veracruz", key="destino")
-    default_time = datetime.datetime.now(datetime.timezone.utc).astimezone(LOCAL_TZ).strftime("%Y-%m-%d %H:%M")
+    utc_now = datetime.datetime.now(datetime.timezone.utc)
+    default_time = utc_now.astimezone(LOCAL_TZ).strftime("%Y-%m-%d %H:%M")
+    st.write("UTC ahora:", utc_now.strftime("%Y-%m-%d %H:%M:%S %Z"))
+    st.write("Valor por defecto local:", default_time)
     hora_local = st.text_input("Hora Local (YYYY-MM-DD HH:MM)", default_time, key="hora")
     velocidad = st.number_input("Velocidad km/h", 80, key="vel")
     
     if st.button("Obtener Pronóstico", key="btn"):
         try:
             user_local = datetime.datetime.strptime(hora_local, "%Y-%m-%d %H:%M")
+            user_local = user_local.replace(tzinfo=LOCAL_TZ)
         except ValueError:
             st.error("Formato incorrecto — usa YYYY-MM-DD HH:MM")
             return
