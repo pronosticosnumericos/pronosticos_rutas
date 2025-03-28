@@ -138,12 +138,8 @@ def main_streamlit():
     st.title("Pronóstico de Ruta con WRF")
     origen = st.text_input("Origen", "Ciudad de México", key="origen")
     destino = st.text_input("Destino", "Veracruz", key="destino")
-    hora_local = st.text_input(
-    "Hora Local (YYYY-MM-DD HH:MM)",
-    datetime.datetime.now(tz=LOCAL_TZ).strftime("%Y-%m-%d %H:%M"),
-    key="hora"
-    )
-    
+    default_time = datetime.datetime.now(datetime.timezone.utc).astimezone(LOCAL_TZ).strftime("%Y-%m-%d %H:%M")
+    hora_local = st.text_input("Hora Local (YYYY-MM-DD HH:MM)", default_time, key="hora")
     velocidad = st.number_input("Velocidad km/h", 80, key="vel")
     
     if st.button("Obtener Pronóstico", key="btn"):
