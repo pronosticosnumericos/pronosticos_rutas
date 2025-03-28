@@ -12,7 +12,6 @@ import streamlit_authenticator as stauth
 import yaml
 from yaml.loader import SafeLoader
 
-
 # ————— CARGA DE CONFIGURACIÓN —————
 with open("config.yaml") as file:
     config = yaml.load(file, Loader=SafeLoader)
@@ -24,9 +23,7 @@ authenticator = stauth.Authenticate(
     config["cookie"]["expiry_days"]
 )
 
-                      # ← Detiene ejecución
-
-
+# ————— Configurar zona horaria local —————
 try:
     from zoneinfo import ZoneInfo
 except ImportError:
@@ -102,7 +99,7 @@ def forecast_point(seg, ds):
 def route_forecast_real(origin, destination, start_time, speed, ds):
     coords = get_route_osrm(origin, destination)
     segments = segment_route(coords, start_time, speed)
-    with ThreadPoolExecutor(max_workers=16) as executor:  # Ajusta max_workers según el entorno
+    with ThreadPoolExecutor(max_workers=16) as executor:
         forecast = list(executor.map(lambda seg: forecast_point(seg, ds), segments))
     return forecast, coords
 
@@ -124,12 +121,9 @@ def generar_mapa(coords, forecast, origin, destination):
 def load_dataset_zarr():
     BASE_DIR = Path(__file__).parent.resolve()
     zarr_path = BASE_DIR / "wrf_actual.zarr"
-    # Carga el dataset sin chunking
     ds = xr.open_zarr(zarr_path)
-    # Aplica el rechunking después de la carga
     ds = ds.chunk({"time": 1, "lat": 50, "lon": 50})
     return ds
-
 
 ds = load_dataset_zarr()
 
@@ -138,20 +132,25 @@ def main_streamlit():
     st.title("Pronóstico de Ruta con WRF")
     origen = st.text_input("Origen", "Ciudad de México", key="origen")
     destino = st.text_input("Destino", "Veracruz", key="destino")
-    hora_local_str = st.text_input("Hora Local (YYYY-MM-DD HH:MM)", 
-                               datetime.datetime.now(tz=LOCAL_TZ).strftime("%Y-%m-%d %H:%M"),
-                               key="hora")
+    hora_local_str = st.text_input(
+        "Hora Local (YYYY-MM-DD HH:MM)",
+        datetime.datetime.now(tz=LOCAL_TZ).strftime("%Y-%m-%d %H:%M"),
+        key="hora"
+    )
+    
+    try:
+        # Convierte el string a un objeto datetime y lo marca como hora local
+        user_local = datetime.datetime.strptime(hora_local_str, "%Y-%m-%d %H:%M")
+        user_local = user_local.replace(tzinfo=LOCAL_TZ)
+    except ValueError:
+        st.error("Formato incorrecto — usa YYYY-MM-DD HH:MM")
+        st.stop()
+
     velocidad = st.number_input("Velocidad km/h", 80, key="vel")
     
     if st.button("Obtener Pronóstico", key="btn"):
-        try:
-            user_local = datetime.datetime.strptime(hora_local, "%Y-%m-%d %H:%M")
-        except ValueError:
-            st.error("Formato incorrecto — usa YYYY-MM-DD HH:MM")
-            return
-        
-        # Convertir hora local a UTC y luego seleccionar el tiempo más cercano en ds
-        start_utc = user_local.replace(tzinfo=LOCAL_TZ).astimezone(datetime.timezone.utc).replace(tzinfo=None)
+        # Convierte a UTC para hacer la búsqueda en el dataset
+        start_utc = user_local.astimezone(datetime.timezone.utc).replace(tzinfo=None)
         nearest = pd.to_datetime(ds.time.sel(time=start_utc, method="nearest").values)
         start = nearest.to_pydatetime()
         
@@ -164,7 +163,7 @@ def main_streamlit():
             start, velocidad, ds
         )
         df = pd.DataFrame(forecast)
-        # Convertir time_utc a hora local (como texto) sin problemas de tz
+        # Convertir time_utc a hora local para mostrarla
         df["time_local"] = df["time_utc"].apply(
             lambda s: datetime.datetime.fromisoformat(s)
                         .replace(tzinfo=datetime.timezone.utc)
@@ -181,19 +180,17 @@ def main_streamlit():
 
 # ————— LOGIN —————
 authenticator.login(location="main")
-
 status = st.session_state.get("authentication_status")
 
 if status:
     name = st.session_state["name"]
     st.write(f"✅ Bienvenido, **{name}**")
     authenticator.logout("Cerrar sesión", "main")
-    main_streamlit()               # ← Solo aquí ejecuto tu app
-
+    main_streamlit()
 elif status is False:
     st.error("❌ Usuario o contraseña incorrectos")
-    st.stop()                      # ← Detiene ejecución
-
+    st.stop()
 else:
     st.info("🔒 Ingresa tus credenciales para acceder")
     st.stop()
+
