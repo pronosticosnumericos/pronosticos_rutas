@@ -1,6 +1,4 @@
-import datetime
-import sys
-import os, math, requests
+import os, datetime, math, requests
 import pandas as pd, numpy as np
 from shapely.geometry import LineString
 import folium
@@ -9,25 +7,20 @@ from metpy.units import units
 import metpy.calc as mpcalc
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
-
 import streamlit as st
 import streamlit_authenticator as stauth
 import yaml
 from yaml.loader import SafeLoader
 
-# --- Configurar zona horaria local ---
 try:
     from zoneinfo import ZoneInfo
 except ImportError:
     from backports.zoneinfo import ZoneInfo
 LOCAL_TZ = ZoneInfo("America/Mexico_City")
 
-st.write("### Debug info")
-st.write("Python version:", sys.version)
-st.write("DateTime now() (no tz, depende del servidor):", datetime.datetime.now())
-st.write("DateTime now(timezone.utc):", datetime.datetime.now(datetime.timezone.utc))
 
-# --- Carga de config para login ---
+
+# ————— CARGA DE CONFIGURACIÓN —————
 with open("config.yaml") as file:
     config = yaml.load(file, Loader=SafeLoader)
 
@@ -38,7 +31,13 @@ authenticator = stauth.Authenticate(
     config["cookie"]["expiry_days"]
 )
 
-# --- Funciones comunes ---
+                      # ← Detiene ejecución
+
+
+
+
+# -------------------------- Funciones comunes --------------------------
+
 def geocode(place_name):
     url = f"https://nominatim.openstreetmap.org/search?format=json&q={place_name}"
     r = requests.get(url, headers={"User-Agent": "MiApp/1.0"})
@@ -75,6 +74,7 @@ def segment_route(coords, start_time, speed_kmh, km_step=10):
     return segments
 
 def interpolate(ds, var, lat, lon, t):
+    # Selecciona el valor más cercano para acelerar el proceso
     val = ds[var].sel(time=t, lat=lat, lon=lon, method="nearest").compute().values
     return float(val) if val is not None else np.nan
 
@@ -105,12 +105,13 @@ def forecast_point(seg, ds):
 def route_forecast_real(origin, destination, start_time, speed, ds):
     coords = get_route_osrm(origin, destination)
     segments = segment_route(coords, start_time, speed)
-    with ThreadPoolExecutor(max_workers=16) as executor:
+    with ThreadPoolExecutor(max_workers=16) as executor:  # Ajusta max_workers según el entorno
         forecast = list(executor.map(lambda seg: forecast_point(seg, ds), segments))
     return forecast, coords
 
 def generar_mapa(coords, forecast, origin, destination):
-    mid = [(origin["lat"] + destination["lat"]) / 2, (origin["lon"] + destination["lon"]) / 2]
+    mid = [(origin["lat"] + destination["lat"]) / 2,
+           (origin["lon"] + destination["lon"]) / 2]
     m = folium.Map(location=mid, zoom_start=7)
     folium.PolyLine([(y, x) for x, y in coords], color="blue", weight=4).add_to(m)
     for seg in forecast:
@@ -121,97 +122,84 @@ def generar_mapa(coords, forecast, origin, destination):
         ).add_to(m)
     m.save("ruta_map.html")
 
+# -------------------------- Cargar dataset desde Zarr --------------------------
 @st.cache_data(show_spinner=False)
 def load_dataset_zarr():
     BASE_DIR = Path(__file__).parent.resolve()
     zarr_path = BASE_DIR / "wrf_actual.zarr"
+    # Carga el dataset sin chunking
     ds = xr.open_zarr(zarr_path)
+    # Aplica el rechunking después de la carga
     ds = ds.chunk({"time": 1, "lat": 50, "lon": 50})
     return ds
 
+
 ds = load_dataset_zarr()
 
-# --- Lógica principal ---
+# -------------------------- Función principal (Streamlit) --------------------------
 def main_streamlit():
     st.title("Pronóstico de Ruta con WRF")
-
-    # 1. Calculamos la hora local por defecto, partiendo de UTC
-    utc_now = datetime.datetime.now(datetime.timezone.utc)
-    local_now = utc_now.astimezone(LOCAL_TZ)
-    default_str = local_now.strftime("%Y-%m-%d %H:%M")
-
-    # 2. Mostramos info de depuración
-    st.write("**utc_now** =", utc_now)
-    st.write("**local_now** =", local_now)
-    st.write("**default_str** =", default_str)
-
-    # 3. Campos de entrada
     origen = st.text_input("Origen", "Ciudad de México", key="origen")
     destino = st.text_input("Destino", "Veracruz", key="destino")
-    hora_local_str = st.text_input("Hora Local (YYYY-MM-DD HH:MM)", default_str, key="hora")
+    utc_now = datetime.datetime.now(datetime.timezone.utc)
+    default_time = utc_now.astimezone(LOCAL_TZ).strftime("%Y-%m-%d %H:%M")
+    st.write("UTC ahora:", utc_now.strftime("%Y-%m-%d %H:%M:%S %Z"))
+    st.write("Valor por defecto local:", default_time)
+    hora_local = st.text_input("Hora Local (YYYY-MM-DD HH:MM)", default_time, key="hora")
     velocidad = st.number_input("Velocidad km/h", 80, key="vel")
-
-    # 4. Acciones al pulsar el botón
+    
     if st.button("Obtener Pronóstico", key="btn"):
-        st.write("Ingresaste hora_local_str =", hora_local_str)
         try:
-            # 4a. Parsear la hora como naive
-            naive_dt = datetime.datetime.strptime(hora_local_str, "%Y-%m-%d %H:%M")
-            # 4b. Asignar la zona local
-            user_local = naive_dt.replace(tzinfo=LOCAL_TZ)
+            user_local = datetime.datetime.strptime(hora_local, "%Y-%m-%d %H:%M")
+            user_local = user_local.replace(tzinfo=LOCAL_TZ)
         except ValueError:
             st.error("Formato incorrecto — usa YYYY-MM-DD HH:MM")
             return
-
-        st.write("Interpretada como local:", user_local, user_local.tzinfo)
-
-        # 4c. Convertir a UTC naive (para machear con dataset)
-        start_utc_naive = user_local.astimezone(datetime.timezone.utc).replace(tzinfo=None)
-        st.write("Convertida a UTC naive:", start_utc_naive)
-
-        # 4d. Seleccionar la hora más cercana en ds
-        nearest = pd.to_datetime(ds.time.sel(time=start_utc_naive, method="nearest").values)
-        st.write("Hora en ds (nearest) =", nearest)
+        
+        # Convertir hora local a UTC y luego seleccionar el tiempo más cercano en ds
+        start_utc = user_local.replace(tzinfo=LOCAL_TZ).astimezone(datetime.timezone.utc).replace(tzinfo=None)
+        nearest = pd.to_datetime(ds.time.sel(time=start_utc, method="nearest").values)
         start = nearest.to_pydatetime()
-
-        # 5. Cálculo de ruta
+        
         lat_o, lon_o = geocode(origen)
         lat_d, lon_d = geocode(destino)
+        
         forecast, coords = route_forecast_real(
             {"lat": lat_o, "lon": lon_o},
             {"lat": lat_d, "lon": lon_d},
             start, velocidad, ds
         )
         df = pd.DataFrame(forecast)
-
-        # 6. Convertir time_utc a hora local para mostrar
-        df["time_local"] = (
-            pd.to_datetime(df["time_utc"], utc=True)
-              .dt.tz_convert(LOCAL_TZ)
-              .dt.strftime("%Y-%m-%d %H:%M:%S %Z")
+        # Convertir time_utc a hora local (como texto) sin problemas de tz
+        df["time_local"] = df["time_utc"].apply(
+            lambda s: datetime.datetime.fromisoformat(s)
+                        .replace(tzinfo=datetime.timezone.utc)
+                        .astimezone(LOCAL_TZ)
+                        .strftime("%Y-%m-%d %H:%M:%S %Z")
         )
-
+        
         st.subheader("Pronóstico de la Ruta")
-        st.dataframe(df[["segment_id", "time_local", "temp_c", "rain_mm_h", "wind_km_h", "risk_level"]])
-
+        st.write(df[["segment_id", "time_local", "temp_c", "rain_mm_h", "wind_km_h", "risk_level"]])
+        
         generar_mapa(coords, forecast, {"lat": lat_o, "lon": lon_o}, {"lat": lat_d, "lon": lon_d})
         with open("ruta_map.html") as f:
             st.components.v1.html(f.read(), height=600)
 
-
-# --- LOGIN ---
+# ————— LOGIN —————
 authenticator.login(location="main")
+
 status = st.session_state.get("authentication_status")
 
 if status:
     name = st.session_state["name"]
     st.write(f"✅ Bienvenido, **{name}**")
     authenticator.logout("Cerrar sesión", "main")
-    main_streamlit()
+    main_streamlit()               # ← Solo aquí ejecuto tu app
+
 elif status is False:
     st.error("❌ Usuario o contraseña incorrectos")
-    st.stop()
+    st.stop()                      # ← Detiene ejecución
+
 else:
     st.info("🔒 Ingresa tus credenciales para acceder")
     st.stop()
-

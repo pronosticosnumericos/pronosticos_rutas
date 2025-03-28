@@ -11,3 +11,4 @@ dask
 tzdata
 bcrypt
 streamlit-authenticator
+pytz
