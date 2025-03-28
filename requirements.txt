@@ -10,3 +10,4 @@ zarr
 dask
 tzdata
 bcrypt
+streamlit-authenticator
