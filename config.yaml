@@ -1,0 +1,10 @@
+credentials:
+  usernames:
+    juanperez:
+      email: juan@example.com
+      name: Juan Pérez
+      password: password123
+cookie:
+  expiry_days: 30
+  key: your_random_cookie_key
+  name: your_cookie_name

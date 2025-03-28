@@ -8,6 +8,24 @@ import metpy.calc as mpcalc
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
 import streamlit as st
+import streamlit_authenticator as stauth
+import yaml
+from yaml.loader import SafeLoader
+
+
+# ————— CARGA DE CONFIGURACIÓN —————
+with open("config.yaml") as file:
+    config = yaml.load(file, Loader=SafeLoader)
+
+authenticator = stauth.Authenticate(
+    config["credentials"],
+    config["cookie"]["name"],
+    config["cookie"]["key"],
+    config["cookie"]["expiry_days"]
+)
+
+                      # ← Detiene ejecución
+
 
 try:
     from zoneinfo import ZoneInfo
@@ -120,28 +138,20 @@ def main_streamlit():
     st.title("Pronóstico de Ruta con WRF")
     origen = st.text_input("Origen", "Ciudad de México", key="origen")
     destino = st.text_input("Destino", "Veracruz", key="destino")
-    
-    # Muestra la hora local (como referencia)
     hora_local = st.text_input("Hora Local (YYYY-MM-DD HH:MM)", 
-                               datetime.datetime.now(LOCAL_TZ).strftime("%Y-%m-%d %H:%M"),
-                               key="hora_local")
-    # Nuevo campo para ingresar la hora de salida deseada
-    hora_salida = st.text_input("Hora de Salida (YYYY-MM-DD HH:MM)", 
-                                datetime.datetime.now(LOCAL_TZ).strftime("%Y-%m-%d %H:%M"),
-                                key="hora_salida")
-    
+                               datetime.datetime.now().strftime("%Y-%m-%d %H:%M"),
+                               key="hora")
     velocidad = st.number_input("Velocidad km/h", 80, key="vel")
     
     if st.button("Obtener Pronóstico", key="btn"):
         try:
-            # Parseamos la hora de salida ingresada por el usuario
-            user_salida = datetime.datetime.strptime(hora_salida, "%Y-%m-%d %H:%M")
+            user_local = datetime.datetime.strptime(hora_local, "%Y-%m-%d %H:%M")
         except ValueError:
-            st.error("Formato incorrecto en la hora de salida — usa YYYY-MM-DD HH:MM")
+            st.error("Formato incorrecto — usa YYYY-MM-DD HH:MM")
             return
         
-        # Convertir la hora de salida a UTC y obtener el tiempo más cercano en el dataset
-        start_utc = user_salida.replace(tzinfo=LOCAL_TZ).astimezone(datetime.timezone.utc).replace(tzinfo=None)
+        # Convertir hora local a UTC y luego seleccionar el tiempo más cercano en ds
+        start_utc = user_local.replace(tzinfo=LOCAL_TZ).astimezone(datetime.timezone.utc).replace(tzinfo=None)
         nearest = pd.to_datetime(ds.time.sel(time=start_utc, method="nearest").values)
         start = nearest.to_pydatetime()
         
@@ -154,7 +164,7 @@ def main_streamlit():
             start, velocidad, ds
         )
         df = pd.DataFrame(forecast)
-        # Convertir time_utc a hora local para mostrarla al usuario
+        # Convertir time_utc a hora local (como texto) sin problemas de tz
         df["time_local"] = df["time_utc"].apply(
             lambda s: datetime.datetime.fromisoformat(s)
                         .replace(tzinfo=datetime.timezone.utc)
@@ -169,6 +179,21 @@ def main_streamlit():
         with open("ruta_map.html") as f:
             st.components.v1.html(f.read(), height=600)
 
-if __name__ == "__main__":
-    main_streamlit()
+# ————— LOGIN —————
+authenticator.login(location="main")
 
+status = st.session_state.get("authentication_status")
+
+if status:
+    name = st.session_state["name"]
+    st.write(f"✅ Bienvenido, **{name}**")
+    authenticator.logout("Cerrar sesión", "main")
+    main_streamlit()               # ← Solo aquí ejecuto tu app
+
+elif status is False:
+    st.error("❌ Usuario o contraseña incorrectos")
+    st.stop()                      # ← Detiene ejecución
+
+else:
+    st.info("🔒 Ingresa tus credenciales para acceder")
+    st.stop()
