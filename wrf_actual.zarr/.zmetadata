@@ -48,7 +48,7 @@
             "GFDDA_END_H": 0,
             "GFDDA_INTERVAL_M": 0,
             "GHG_INPUT": 1,
-            "GMT": 6.0,
+            "GMT": 12.0,
             "GRAV_SETTLING": 0,
             "GRIDTYPE": "C",
             "GRID_FDDA": 0,
@@ -108,7 +108,7 @@
             "SGFDDA_INTERVAL_M": 0,
             "SHCU_PHYSICS": 0,
             "SIMULATION_INITIALIZATION_TYPE": "REAL-DATA CASE",
-            "SIMULATION_START_DATE": "2025-03-29_06:00:00",
+            "SIMULATION_START_DATE": "2025-03-29_12:00:00",
             "SKEBS_ON": 0,
             "SLUCM_DISTRIBUTED_DRAG": 0,
             "SMOOTH_OPTION": 0,
@@ -119,7 +119,7 @@
             "SOUTH-NORTH_PATCH_START_UNSTAG": 1,
             "SST_UPDATE": 0,
             "STAND_LON": 0.0,
-            "START_DATE": "2025-03-29_06:00:00",
+            "START_DATE": "2025-03-29_12:00:00",
             "SURFACE_INPUT_SOURCE": 1,
             "SWINT_OPT": 0,
             "SWRAD_SCAT": 1.0,
@@ -427,9 +427,9 @@
                 "time"
             ],
             "calendar": "proleptic_gregorian",
-            "description": "minutes since 2025-03-29 06:00:00",
+            "description": "minutes since 2025-03-29 12:00:00",
             "stagger": "",
-            "units": "minutes since 2025-03-29T06:00:00"
+            "units": "minutes since 2025-03-29T12:00:00"
         },
         "lat/.zarray": {
             "chunks": [
@@ -506,7 +506,7 @@
                 "time"
             ],
             "calendar": "proleptic_gregorian",
-            "units": "hours since 2025-03-29 06:00:00"
+            "units": "hours since 2025-03-29 12:00:00"
         }
     },
     "zarr_consolidated_format": 1
