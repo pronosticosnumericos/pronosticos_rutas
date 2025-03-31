@@ -46,6 +46,28 @@ def geocode(place_name):
         raise Exception(f"No se encontró {place_name}")
     return float(data[0]["lat"]), float(data[0]["lon"])
 
+def dentro_de_mexico(lat, lon):
+    return 14 <= lat <= 33 and -118 <= lon <= -86
+    
+    
+def buscar_localidad(query):
+    url = f"https://nominatim.openstreetmap.org/search?format=json&q={query}&countrycodes=mx"    
+    r = requests.get(url, headers={"User-Agent": "MiApp/1.0"})
+    return r.json()
+    
+def etiqueta_ruta(forecast):
+    total = len(forecast)
+    high = sum(1 for p in forecast if p["risk_level"] == "high")
+    medium = sum(1 for p in forecast if p["risk_level"] == "medium")
+    if total ==0:
+        return "Sin datos"
+    if high / total > 0.3:
+        return "Ruta insegura"
+    elif medium /total > 0.3:
+        return "Ruta poco segura"
+    else:
+        return "Ruta muy segura"
+
 def get_route_osrm(origin, destination):
     url = (
         f"http://router.project-osrm.org/route/v1/driving/"
