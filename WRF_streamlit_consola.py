@@ -12,31 +12,45 @@ import streamlit_authenticator as stauth
 import yaml
 from yaml.loader import SafeLoader
 
+# --- Configurar zona horaria ---
 try:
     from zoneinfo import ZoneInfo
 except ImportError:
     from backports.zoneinfo import ZoneInfo
 LOCAL_TZ = ZoneInfo("America/Mexico_City")
 
+##########################################
+# FUNCIONES NUEVAS
+##########################################
 
+# 1. Filtro: Verifica que las coordenadas estén en México
+def dentro_de_mexico(lat, lon):
+    # Aproximadamente: latitud entre 14 y 33, longitud entre -118 y -86
+    return 14 <= lat <= 33 and -118 <= lon <= -86
 
-# ————— CARGA DE CONFIGURACIÓN —————
-with open("config.yaml") as file:
-    config = yaml.load(file, Loader=SafeLoader)
+# 2. Búsqueda de localidades con autocompletar (Nominatim, limitado a México)
+def buscar_localidad(query):
+    url = f"https://nominatim.openstreetmap.org/search?format=json&q={query}&countrycodes=mx"
+    r = requests.get(url, headers={"User-Agent": "MiApp/1.0"})
+    return r.json()
 
-authenticator = stauth.Authenticate(
-    config["credentials"],
-    config["cookie"]["name"],
-    config["cookie"]["key"],
-    config["cookie"]["expiry_days"]
-)
+# 3. Etiquetado global de ruta según riesgo (usando la proporción de puntos)
+def etiqueta_ruta(forecast):
+    total = len(forecast)
+    high = sum(1 for p in forecast if p["risk_level"] == "high")
+    medium = sum(1 for p in forecast if p["risk_level"] == "medium")
+    if total == 0:
+        return "Sin datos"
+    if high / total > 0.3:
+        return "Ruta insegura"
+    elif medium / total > 0.3:
+        return "Ruta poco segura"
+    else:
+        return "Ruta muy segura"
 
-                      # ← Detiene ejecución
-
-
-
-
-# -------------------------- Funciones comunes --------------------------
+##########################################
+# FUNCIONES EXISTENTES
+##########################################
 
 def geocode(place_name):
     url = f"https://nominatim.openstreetmap.org/search?format=json&q={place_name}"
@@ -45,28 +59,6 @@ def geocode(place_name):
     if not data:
         raise Exception(f"No se encontró {place_name}")
     return float(data[0]["lat"]), float(data[0]["lon"])
-
-def dentro_de_mexico(lat, lon):
-    return 14 <= lat <= 33 and -118 <= lon <= -86
-    
-    
-def buscar_localidad(query):
-    url = f"https://nominatim.openstreetmap.org/search?format=json&q={query}&countrycodes=mx"    
-    r = requests.get(url, headers={"User-Agent": "MiApp/1.0"})
-    return r.json()
-    
-def etiqueta_ruta(forecast):
-    total = len(forecast)
-    high = sum(1 for p in forecast if p["risk_level"] == "high")
-    medium = sum(1 for p in forecast if p["risk_level"] == "medium")
-    if total ==0:
-        return "Sin datos"
-    if high / total > 0.3:
-        return "Ruta insegura"
-    elif medium /total > 0.3:
-        return "Ruta poco segura"
-    else:
-        return "Ruta muy segura"
 
 def get_route_osrm(origin, destination):
     url = (
@@ -96,7 +88,7 @@ def segment_route(coords, start_time, speed_kmh, km_step=10):
     return segments
 
 def interpolate(ds, var, lat, lon, t):
-    # Selecciona el valor más cercano para acelerar el proceso
+    # Selecciona el valor más cercano
     val = ds[var].sel(time=t, lat=lat, lon=lon, method="nearest").compute().values
     return float(val) if val is not None else np.nan
 
@@ -127,7 +119,7 @@ def forecast_point(seg, ds):
 def route_forecast_real(origin, destination, start_time, speed, ds):
     coords = get_route_osrm(origin, destination)
     segments = segment_route(coords, start_time, speed)
-    with ThreadPoolExecutor(max_workers=16) as executor:  # Ajusta max_workers según el entorno
+    with ThreadPoolExecutor(max_workers=16) as executor:
         forecast = list(executor.map(lambda seg: forecast_point(seg, ds), segments))
     return forecast, coords
 
@@ -144,25 +136,73 @@ def generar_mapa(coords, forecast, origin, destination):
         ).add_to(m)
     m.save("ruta_map.html")
 
-# -------------------------- Cargar dataset desde Zarr --------------------------
 @st.cache_data(show_spinner=False)
 def load_dataset_zarr():
     BASE_DIR = Path(__file__).parent.resolve()
     zarr_path = BASE_DIR / "wrf_actual.zarr"
-    # Carga el dataset sin chunking
     ds = xr.open_zarr(zarr_path)
-    # Aplica el rechunking después de la carga
     ds = ds.chunk({"time": 1, "lat": 50, "lon": 50})
     return ds
 
-
 ds = load_dataset_zarr()
 
-# -------------------------- Función principal (Streamlit) --------------------------
+##########################################
+# CONFIGURACIÓN DE LOGIN
+##########################################
+with open("config.yaml") as file:
+    config = yaml.load(file, Loader=SafeLoader)
+
+authenticator = stauth.Authenticate(
+    config["credentials"],
+    config["cookie"]["name"],
+    config["cookie"]["key"],
+    config["cookie"]["expiry_days"]
+)
+
+##########################################
+# FUNCIÓN PRINCIPAL STREAMLIT
+##########################################
 def main_streamlit():
     st.title("Pronóstico de Ruta con WRF")
-    origen = st.text_input("Origen", "Ciudad de México", key="origen")
-    destino = st.text_input("Destino", "Veracruz", key="destino")
+    
+    st.write("### Autocompletar localizaciones")
+    
+    # Autocompletar para origen
+    origen_query = st.text_input("Buscar localidad de origen", "Ciudad de México", key="origen_query")
+    origen_lat, origen_lon = None, None
+    if origen_query:
+        resultados_origen = buscar_localidad(origen_query)
+        if resultados_origen:
+            opciones_origen = [r["display_name"] for r in resultados_origen]
+            indice_origen = st.selectbox("Seleccione localidad de origen", range(len(opciones_origen)), format_func=lambda i: opciones_origen[i])
+            origen_lat = float(resultados_origen[indice_origen]["lat"])
+            origen_lon = float(resultados_origen[indice_origen]["lon"])
+    if origen_lat is None:
+        # Valor por defecto
+        origen_lat, origen_lon = geocode("Ciudad de México")
+    
+    # Autocompletar para destino
+    destino_query = st.text_input("Buscar localidad de destino", "Veracruz", key="destino_query")
+    destino_lat, destino_lon = None, None
+    if destino_query:
+        resultados_destino = buscar_localidad(destino_query)
+        if resultados_destino:
+            opciones_destino = [r["display_name"] for r in resultados_destino]
+            indice_destino = st.selectbox("Seleccione localidad de destino", range(len(opciones_destino)), format_func=lambda i: opciones_destino[i])
+            destino_lat = float(resultados_destino[indice_destino]["lat"])
+            destino_lon = float(resultados_destino[indice_destino]["lon"])
+    if destino_lat is None:
+        destino_lat, destino_lon = geocode("Veracruz")
+    
+    # Filtro: Verificar que ambas localizaciones estén en México
+    if not (dentro_de_mexico(origen_lat, origen_lon) and dentro_de_mexico(destino_lat, destino_lon)):
+        st.error("La ruta debe estar dentro de México.")
+        return
+    
+    st.write("Coordenadas Origen:", origen_lat, origen_lon)
+    st.write("Coordenadas Destino:", destino_lat, destino_lon)
+    
+    # Hora y velocidad
     utc_now = datetime.datetime.now(datetime.timezone.utc)
     default_time = utc_now.astimezone(LOCAL_TZ).strftime("%Y-%m-%d %H:%M")
     st.write("UTC ahora:", utc_now.strftime("%Y-%m-%d %H:%M:%S %Z"))
@@ -178,21 +218,19 @@ def main_streamlit():
             st.error("Formato incorrecto — usa YYYY-MM-DD HH:MM")
             return
         
-        # Convertir hora local a UTC y luego seleccionar el tiempo más cercano en ds
-        start_utc = user_local.replace(tzinfo=LOCAL_TZ).astimezone(datetime.timezone.utc).replace(tzinfo=None)
+        # Convertir a UTC naive para buscar en ds.time
+        start_utc = user_local.astimezone(datetime.timezone.utc).replace(tzinfo=None)
         nearest = pd.to_datetime(ds.time.sel(time=start_utc, method="nearest").values)
         start = nearest.to_pydatetime()
         
-        lat_o, lon_o = geocode(origen)
-        lat_d, lon_d = geocode(destino)
-        
+        # Obtener pronóstico
         forecast, coords = route_forecast_real(
-            {"lat": lat_o, "lon": lon_o},
-            {"lat": lat_d, "lon": lon_d},
+            {"lat": origen_lat, "lon": origen_lon},
+            {"lat": destino_lat, "lon": destino_lon},
             start, velocidad, ds
         )
         df = pd.DataFrame(forecast)
-        # Convertir time_utc a hora local (como texto) sin problemas de tz
+        # Convertir time_utc a hora local para mostrarla
         df["time_local"] = df["time_utc"].apply(
             lambda s: datetime.datetime.fromisoformat(s)
                         .replace(tzinfo=datetime.timezone.utc)
@@ -201,27 +239,31 @@ def main_streamlit():
         )
         
         st.subheader("Pronóstico de la Ruta")
-        st.write(df[["segment_id", "time_local", "temp_c", "rain_mm_h", "wind_km_h", "risk_level"]])
+        st.dataframe(df[["segment_id", "time_local", "temp_c", "rain_mm_h", "wind_km_h", "risk_level"]])
         
-        generar_mapa(coords, forecast, {"lat": lat_o, "lon": lon_o}, {"lat": lat_d, "lon": lon_d})
+        # Etiquetado global de la ruta
+        ruta_etiqueta = etiqueta_ruta(forecast)
+        st.write("**Evaluación general de la ruta:**", ruta_etiqueta)
+        
+        generar_mapa(coords, forecast, {"lat": origen_lat, "lon": origen_lon}, {"lat": destino_lat, "lon": destino_lon})
         with open("ruta_map.html") as f:
             st.components.v1.html(f.read(), height=600)
 
-# ————— LOGIN —————
+##########################################
+# CONFIGURACIÓN DE LOGIN
+##########################################
 authenticator.login(location="main")
-
 status = st.session_state.get("authentication_status")
 
 if status:
     name = st.session_state["name"]
     st.write(f"✅ Bienvenido, **{name}**")
     authenticator.logout("Cerrar sesión", "main")
-    main_streamlit()               # ← Solo aquí ejecuto tu app
-
+    main_streamlit()  # Se ejecuta la app solo si el login es exitoso.
 elif status is False:
     st.error("❌ Usuario o contraseña incorrectos")
-    st.stop()                      # ← Detiene ejecución
-
+    st.stop()
 else:
     st.info("🔒 Ingresa tus credenciales para acceder")
     st.stop()
+
