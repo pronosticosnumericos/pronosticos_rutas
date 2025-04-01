@@ -11,6 +11,7 @@ import streamlit as st
 import streamlit_authenticator as stauth
 import yaml
 from yaml.loader import SafeLoader
+from st_aggrid import AgGrid, GridOptionsBuilder  # Componente de autocompletado
 
 # --- Configurar zona horaria ---
 try:
@@ -28,13 +29,23 @@ def dentro_de_mexico(lat, lon):
     # Aproximadamente: latitud entre 14 y 33, longitud entre -118 y -86
     return 14 <= lat <= 33 and -118 <= lon <= -86
 
-# 2. Búsqueda de localidades con autocompletar (Nominatim, limitado a México)
-def buscar_localidad(query):
+# 2. Buscar localidades: Consulta Nominatim limitado a México y devuelve un DataFrame
+def buscar_localidades_df(query):
     url = f"https://nominatim.openstreetmap.org/search?format=json&q={query}&countrycodes=mx"
     r = requests.get(url, headers={"User-Agent": "MiApp/1.0"})
-    return r.json()
+    if r.status_code == 200:
+        resultados = r.json()
+        if resultados:
+            df = pd.DataFrame(resultados)
+            # Nos aseguramos de tener las columnas necesarias
+            if "display_name" in df.columns and "lat" in df.columns and "lon" in df.columns:
+                df = df[["display_name", "lat", "lon"]]
+                df["lat"] = pd.to_numeric(df["lat"], errors="coerce")
+                df["lon"] = pd.to_numeric(df["lon"], errors="coerce")
+                return df
+    return pd.DataFrame()
 
-# 3. Etiquetado global de ruta según riesgo (usando la proporción de puntos)
+# 3. Etiquetado global de ruta según riesgo
 def etiqueta_ruta(forecast):
     total = len(forecast)
     high = sum(1 for p in forecast if p["risk_level"] == "high")
@@ -88,7 +99,6 @@ def segment_route(coords, start_time, speed_kmh, km_step=10):
     return segments
 
 def interpolate(ds, var, lat, lon, t):
-    # Selecciona el valor más cercano
     val = ds[var].sel(time=t, lat=lat, lon=lon, method="nearest").compute().values
     return float(val) if val is not None else np.nan
 
@@ -165,33 +175,48 @@ authenticator = stauth.Authenticate(
 def main_streamlit():
     st.title("Pronóstico de Ruta con WRF")
     
-    st.write("### Autocompletar localizaciones")
+    st.write("### Ingrese las localidades")
     
-    # Autocompletar para origen
-    origen_query = st.text_input("Buscar localidad de origen", "Ciudad de México", key="origen_query")
-    origen_lat, origen_lon = None, None
+    # Autocompletar para Origen
+    origen_query = st.text_input("Localidad de Origen", "Ciudad de México", key="origen_query")
     if origen_query:
-        resultados_origen = buscar_localidad(origen_query)
-        if resultados_origen:
-            opciones_origen = [r["display_name"] for r in resultados_origen]
-            indice_origen = st.selectbox("Seleccione localidad de origen", range(len(opciones_origen)), format_func=lambda i: opciones_origen[i])
-            origen_lat = float(resultados_origen[indice_origen]["lat"])
-            origen_lon = float(resultados_origen[indice_origen]["lon"])
-    if origen_lat is None:
-        # Valor por defecto
+        df_origen = buscar_localidades_df(origen_query)
+        if not df_origen.empty:
+            gb_origen = GridOptionsBuilder.from_dataframe(df_origen)
+            gb_origen.configure_default_column(filter=True, sortable=True)
+            gridOptions_origen = gb_origen.build()
+            st.markdown("#### Seleccione una opción de Origen")
+            grid_response_origen = AgGrid(df_origen, gridOptions=gridOptions_origen, update_mode="SELECTION_CHANGED", height=200, fit_columns_on_grid_load=True)
+            selected_origen = grid_response_origen.get("selected_rows")
+            if selected_origen:
+                origen_lat = float(selected_origen[0]["lat"])
+                origen_lon = float(selected_origen[0]["lon"])
+            else:
+                origen_lat, origen_lon = geocode("Ciudad de México")
+        else:
+            origen_lat, origen_lon = geocode("Ciudad de México")
+    else:
         origen_lat, origen_lon = geocode("Ciudad de México")
     
-    # Autocompletar para destino
-    destino_query = st.text_input("Buscar localidad de destino", "Veracruz", key="destino_query")
-    destino_lat, destino_lon = None, None
+    # Autocompletar para Destino
+    destino_query = st.text_input("Localidad de Destino", "Veracruz", key="destino_query")
     if destino_query:
-        resultados_destino = buscar_localidad(destino_query)
-        if resultados_destino:
-            opciones_destino = [r["display_name"] for r in resultados_destino]
-            indice_destino = st.selectbox("Seleccione localidad de destino", range(len(opciones_destino)), format_func=lambda i: opciones_destino[i])
-            destino_lat = float(resultados_destino[indice_destino]["lat"])
-            destino_lon = float(resultados_destino[indice_destino]["lon"])
-    if destino_lat is None:
+        df_destino = buscar_localidades_df(destino_query)
+        if not df_destino.empty:
+            gb_destino = GridOptionsBuilder.from_dataframe(df_destino)
+            gb_destino.configure_default_column(filter=True, sortable=True)
+            gridOptions_destino = gb_destino.build()
+            st.markdown("#### Seleccione una opción de Destino")
+            grid_response_destino = AgGrid(df_destino, gridOptions=gridOptions_destino, update_mode="SELECTION_CHANGED", height=200, fit_columns_on_grid_load=True)
+            selected_destino = grid_response_destino.get("selected_rows")
+            if selected_destino:
+                destino_lat = float(selected_destino[0]["lat"])
+                destino_lon = float(selected_destino[0]["lon"])
+            else:
+                destino_lat, destino_lon = geocode("Veracruz")
+        else:
+            destino_lat, destino_lon = geocode("Veracruz")
+    else:
         destino_lat, destino_lon = geocode("Veracruz")
     
     # Filtro: Verificar que ambas localizaciones estén en México
@@ -199,8 +224,7 @@ def main_streamlit():
         st.error("La ruta debe estar dentro de México.")
         return
     
-    st.write("Coordenadas Origen:", origen_lat, origen_lon)
-    st.write("Coordenadas Destino:", destino_lat, destino_lon)
+    # No se muestran las coordenadas, solo se usan internamente.
     
     # Hora y velocidad
     utc_now = datetime.datetime.now(datetime.timezone.utc)
@@ -230,7 +254,6 @@ def main_streamlit():
             start, velocidad, ds
         )
         df = pd.DataFrame(forecast)
-        # Convertir time_utc a hora local para mostrarla
         df["time_local"] = df["time_utc"].apply(
             lambda s: datetime.datetime.fromisoformat(s)
                         .replace(tzinfo=datetime.timezone.utc)

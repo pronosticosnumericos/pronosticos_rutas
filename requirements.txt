@@ -12,3 +12,4 @@ tzdata
 bcrypt
 streamlit-authenticator
 pytz
+streamlit-aggrid
