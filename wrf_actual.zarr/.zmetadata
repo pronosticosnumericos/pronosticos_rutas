@@ -152,7 +152,7 @@
                 "clevel": 3,
                 "cname": "zstd",
                 "id": "blosc",
-                "shuffle": 2
+                "shuffle": 1
             },
             "dtype": "<f4",
             "fill_value": "NaN",
@@ -189,7 +189,7 @@
                 "clevel": 3,
                 "cname": "zstd",
                 "id": "blosc",
-                "shuffle": 2
+                "shuffle": 1
             },
             "dtype": "<f4",
             "fill_value": "NaN",
@@ -226,7 +226,7 @@
                 "clevel": 3,
                 "cname": "zstd",
                 "id": "blosc",
-                "shuffle": 2
+                "shuffle": 1
             },
             "dtype": "<f4",
             "fill_value": "NaN",
@@ -263,7 +263,7 @@
                 "clevel": 3,
                 "cname": "zstd",
                 "id": "blosc",
-                "shuffle": 2
+                "shuffle": 1
             },
             "dtype": "<f4",
             "fill_value": "NaN",
@@ -300,7 +300,7 @@
                 "clevel": 3,
                 "cname": "zstd",
                 "id": "blosc",
-                "shuffle": 2
+                "shuffle": 1
             },
             "dtype": "<f4",
             "fill_value": "NaN",
