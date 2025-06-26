@@ -27,7 +27,7 @@
             "CEN_LON": -102.5,
             "CLDOVRLP": 2,
             "CUDT": 0.0,
-            "CU_PHYSICS": 16,
+            "CU_PHYSICS": 1,
             "DAMPCOEF": 0.20000000298023224,
             "DAMP_OPT": 0,
             "DFI_OPT": 0,
@@ -70,7 +70,7 @@
             "ISURBAN": 13,
             "ISWATER": 17,
             "I_PARENT_START": 1,
-            "JULDAY": 176,
+            "JULDAY": 177,
             "JULYR": 2025,
             "J_PARENT_START": 1,
             "KHDIF": 0.0,
@@ -82,10 +82,10 @@
             "MMINLU": "MODIFIED_IGBP_MODIS_NOAH",
             "MOAD_CEN_LAT": 23.5,
             "MOIST_ADV_OPT": 1,
-            "MP_PHYSICS": 6,
-            "NTASKS_TOTAL": 60,
-            "NTASKS_X": 6,
-            "NTASKS_Y": 10,
+            "MP_PHYSICS": 8,
+            "NTASKS_TOTAL": 20,
+            "NTASKS_X": 4,
+            "NTASKS_Y": 5,
             "NUM_LAND_CAT": 21,
             "OBS_NUDGE_OPT": 0,
             "PARENT_GRID_RATIO": 1,
@@ -100,7 +100,7 @@
             "SCALAR_PBLMIX": 0,
             "SF_LAKE_PHYSICS": 0,
             "SF_OCEAN_PHYSICS": 0,
-            "SF_SFCLAY_PHYSICS": 91,
+            "SF_SFCLAY_PHYSICS": 1,
             "SF_SURFACE_MOSAIC": 0,
             "SF_SURFACE_PHYSICS": 2,
             "SF_URBAN_PHYSICS": 0,
@@ -108,7 +108,7 @@
             "SGFDDA_INTERVAL_M": 0,
             "SHCU_PHYSICS": 0,
             "SIMULATION_INITIALIZATION_TYPE": "REAL-DATA CASE",
-            "SIMULATION_START_DATE": "2025-06-25_18:00:00",
+            "SIMULATION_START_DATE": "2025-06-26_18:00:00",
             "SKEBS_ON": 0,
             "SLUCM_DISTRIBUTED_DRAG": 0,
             "SMOOTH_OPTION": 0,
@@ -117,9 +117,9 @@
             "SOUTH-NORTH_PATCH_END_UNSTAG": 179,
             "SOUTH-NORTH_PATCH_START_STAG": 1,
             "SOUTH-NORTH_PATCH_START_UNSTAG": 1,
-            "SST_UPDATE": 0,
+            "SST_UPDATE": 1,
             "STAND_LON": 0.0,
-            "START_DATE": "2025-06-25_18:00:00",
+            "START_DATE": "2025-06-26_18:00:00",
             "SURFACE_INPUT_SOURCE": 1,
             "SWINT_OPT": 0,
             "SWRAD_SCAT": 1.0,
@@ -152,7 +152,7 @@
                 "clevel": 3,
                 "cname": "zstd",
                 "id": "blosc",
-                "shuffle": 1
+                "shuffle": 2
             },
             "dtype": "<f4",
             "fill_value": "NaN",
@@ -189,7 +189,7 @@
                 "clevel": 3,
                 "cname": "zstd",
                 "id": "blosc",
-                "shuffle": 1
+                "shuffle": 2
             },
             "dtype": "<f4",
             "fill_value": "NaN",
@@ -226,7 +226,7 @@
                 "clevel": 3,
                 "cname": "zstd",
                 "id": "blosc",
-                "shuffle": 1
+                "shuffle": 2
             },
             "dtype": "<f4",
             "fill_value": "NaN",
@@ -263,7 +263,7 @@
                 "clevel": 3,
                 "cname": "zstd",
                 "id": "blosc",
-                "shuffle": 1
+                "shuffle": 2
             },
             "dtype": "<f4",
             "fill_value": "NaN",
@@ -300,7 +300,7 @@
                 "clevel": 3,
                 "cname": "zstd",
                 "id": "blosc",
-                "shuffle": 1
+                "shuffle": 2
             },
             "dtype": "<f4",
             "fill_value": "NaN",
@@ -427,9 +427,9 @@
                 "time"
             ],
             "calendar": "proleptic_gregorian",
-            "description": "minutes since 2025-06-25 18:00:00",
+            "description": "minutes since 2025-06-26 18:00:00",
             "stagger": "",
-            "units": "minutes since 2025-06-25T18:00:00"
+            "units": "minutes since 2025-06-26T18:00:00"
         },
         "lat/.zarray": {
             "chunks": [
@@ -506,7 +506,7 @@
                 "time"
             ],
             "calendar": "proleptic_gregorian",
-            "units": "hours since 2025-06-25 18:00:00"
+            "units": "hours since 2025-06-26 18:00:00"
         }
     },
     "zarr_consolidated_format": 1
