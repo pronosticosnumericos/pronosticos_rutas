@@ -117,7 +117,7 @@
             "SOUTH-NORTH_PATCH_END_UNSTAG": 179,
             "SOUTH-NORTH_PATCH_START_STAG": 1,
             "SOUTH-NORTH_PATCH_START_UNSTAG": 1,
-            "SST_UPDATE": 1,
+            "SST_UPDATE": 0,
             "STAND_LON": 0.0,
             "START_DATE": "2025-06-26_18:00:00",
             "SURFACE_INPUT_SOURCE": 1,
@@ -152,7 +152,7 @@
                 "clevel": 3,
                 "cname": "zstd",
                 "id": "blosc",
-                "shuffle": 1
+                "shuffle": 2
             },
             "dtype": "<f4",
             "fill_value": "NaN",
@@ -189,7 +189,7 @@
                 "clevel": 3,
                 "cname": "zstd",
                 "id": "blosc",
-                "shuffle": 1
+                "shuffle": 2
             },
             "dtype": "<f4",
             "fill_value": "NaN",
@@ -226,7 +226,7 @@
                 "clevel": 3,
                 "cname": "zstd",
                 "id": "blosc",
-                "shuffle": 1
+                "shuffle": 2
             },
             "dtype": "<f4",
             "fill_value": "NaN",
@@ -263,7 +263,7 @@
                 "clevel": 3,
                 "cname": "zstd",
                 "id": "blosc",
-                "shuffle": 1
+                "shuffle": 2
             },
             "dtype": "<f4",
             "fill_value": "NaN",
@@ -300,7 +300,7 @@
                 "clevel": 3,
                 "cname": "zstd",
                 "id": "blosc",
-                "shuffle": 1
+                "shuffle": 2
             },
             "dtype": "<f4",
             "fill_value": "NaN",
