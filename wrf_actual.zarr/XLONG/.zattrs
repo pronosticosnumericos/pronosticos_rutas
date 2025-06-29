@@ -1,0 +1,13 @@
+{
+    "FieldType": 104,
+    "MemoryOrder": "XY ",
+    "_ARRAY_DIMENSIONS": [
+        "time",
+        "lat",
+        "lon"
+    ],
+    "coordinates": "XLONG XLAT",
+    "description": "LONGITUDE, WEST IS NEGATIVE",
+    "stagger": "",
+    "units": "degree_east"
+}
