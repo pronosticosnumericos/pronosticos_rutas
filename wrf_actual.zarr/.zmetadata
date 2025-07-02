@@ -48,7 +48,7 @@
             "GFDDA_END_H": 0,
             "GFDDA_INTERVAL_M": 0,
             "GHG_INPUT": 1,
-            "GMT": 12.0,
+            "GMT": 18.0,
             "GRAV_SETTLING": 0,
             "GRIDTYPE": "C",
             "GRID_FDDA": 0,
@@ -108,7 +108,7 @@
             "SGFDDA_INTERVAL_M": 0,
             "SHCU_PHYSICS": 0,
             "SIMULATION_INITIALIZATION_TYPE": "REAL-DATA CASE",
-            "SIMULATION_START_DATE": "2025-07-01_12:00:00",
+            "SIMULATION_START_DATE": "2025-07-01_18:00:00",
             "SKEBS_ON": 0,
             "SLUCM_DISTRIBUTED_DRAG": 0,
             "SMOOTH_OPTION": 0,
@@ -119,7 +119,7 @@
             "SOUTH-NORTH_PATCH_START_UNSTAG": 1,
             "SST_UPDATE": 0,
             "STAND_LON": 0.0,
-            "START_DATE": "2025-07-01_12:00:00",
+            "START_DATE": "2025-07-01_18:00:00",
             "SURFACE_INPUT_SOURCE": 1,
             "SWINT_OPT": 0,
             "SWRAD_SCAT": 1.0,
@@ -130,9 +130,9 @@
             "TRUELAT2": 60.0,
             "USE_Q_DIABATIC": 0,
             "USE_THETA_M": 1,
-            "WEST-EAST_GRID_DIMENSION": 350,
-            "WEST-EAST_PATCH_END_STAG": 350,
-            "WEST-EAST_PATCH_END_UNSTAG": 349,
+            "WEST-EAST_GRID_DIMENSION": 300,
+            "WEST-EAST_PATCH_END_STAG": 300,
+            "WEST-EAST_PATCH_END_UNSTAG": 299,
             "WEST-EAST_PATCH_START_STAG": 1,
             "WEST-EAST_PATCH_START_UNSTAG": 1,
             "W_DAMPING": 1,
@@ -159,9 +159,9 @@
             "filters": null,
             "order": "C",
             "shape": [
-                72,
+                25,
                 179,
-                349
+                299
             ],
             "zarr_format": 2
         },
@@ -196,9 +196,9 @@
             "filters": null,
             "order": "C",
             "shape": [
-                72,
+                25,
                 179,
-                349
+                299
             ],
             "zarr_format": 2
         },
@@ -233,9 +233,9 @@
             "filters": null,
             "order": "C",
             "shape": [
-                72,
+                25,
                 179,
-                349
+                299
             ],
             "zarr_format": 2
         },
@@ -270,9 +270,9 @@
             "filters": null,
             "order": "C",
             "shape": [
-                72,
+                25,
                 179,
-                349
+                299
             ],
             "zarr_format": 2
         },
@@ -307,9 +307,9 @@
             "filters": null,
             "order": "C",
             "shape": [
-                72,
+                25,
                 179,
-                349
+                299
             ],
             "zarr_format": 2
         },
@@ -328,9 +328,9 @@
         },
         "XLAT/.zarray": {
             "chunks": [
-                72,
+                25,
                 179,
-                349
+                299
             ],
             "compressor": {
                 "blocksize": 0,
@@ -344,9 +344,9 @@
             "filters": null,
             "order": "C",
             "shape": [
-                72,
+                25,
                 179,
-                349
+                299
             ],
             "zarr_format": 2
         },
@@ -365,9 +365,9 @@
         },
         "XLONG/.zarray": {
             "chunks": [
-                72,
+                25,
                 179,
-                349
+                299
             ],
             "compressor": {
                 "blocksize": 0,
@@ -381,9 +381,9 @@
             "filters": null,
             "order": "C",
             "shape": [
-                72,
+                25,
                 179,
-                349
+                299
             ],
             "zarr_format": 2
         },
@@ -402,7 +402,7 @@
         },
         "XTIME/.zarray": {
             "chunks": [
-                72
+                25
             ],
             "compressor": {
                 "blocksize": 0,
@@ -416,7 +416,7 @@
             "filters": null,
             "order": "C",
             "shape": [
-                72
+                25
             ],
             "zarr_format": 2
         },
@@ -427,9 +427,9 @@
                 "time"
             ],
             "calendar": "proleptic_gregorian",
-            "description": "minutes since 2025-07-01 12:00:00",
+            "description": "minutes since 2025-07-01 18:00:00",
             "stagger": "",
-            "units": "minutes since 2025-07-01T12:00:00"
+            "units": "minutes since 2025-07-01T18:00:00"
         },
         "lat/.zarray": {
             "chunks": [
@@ -458,7 +458,7 @@
         },
         "lon/.zarray": {
             "chunks": [
-                349
+                299
             ],
             "compressor": {
                 "blocksize": 0,
@@ -472,7 +472,7 @@
             "filters": null,
             "order": "C",
             "shape": [
-                349
+                299
             ],
             "zarr_format": 2
         },
@@ -483,7 +483,7 @@
         },
         "time/.zarray": {
             "chunks": [
-                72
+                25
             ],
             "compressor": {
                 "blocksize": 0,
@@ -497,7 +497,7 @@
             "filters": null,
             "order": "C",
             "shape": [
-                72
+                25
             ],
             "zarr_format": 2
         },
@@ -506,7 +506,7 @@
                 "time"
             ],
             "calendar": "proleptic_gregorian",
-            "units": "hours since 2025-07-01 12:00:00"
+            "units": "hours since 2025-07-01 18:00:00"
         }
     },
     "zarr_consolidated_format": 1
