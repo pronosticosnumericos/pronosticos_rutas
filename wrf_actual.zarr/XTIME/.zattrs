@@ -5,7 +5,7 @@
         "time"
     ],
     "calendar": "proleptic_gregorian",
-    "description": "minutes since 2025-07-25 06:00:00",
+    "description": "minutes since 2025-07-25 12:00:00",
     "stagger": "",
-    "units": "minutes since 2025-07-25T06:00:00"
+    "units": "minutes since 2025-07-25T12:00:00"
 }
