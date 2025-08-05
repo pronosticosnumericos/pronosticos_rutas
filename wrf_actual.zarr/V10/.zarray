@@ -9,7 +9,7 @@
         "clevel": 3,
         "cname": "zstd",
         "id": "blosc",
-        "shuffle": 1
+        "shuffle": 2
     },
     "dtype": "<f4",
     "fill_value": "NaN",
